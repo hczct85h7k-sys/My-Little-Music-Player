@@ -1,0 +1,1481 @@
+<!-- Chosen Palette: Soft Pastel Pink & Warm Neutral Harmony -->
+<!-- Application Structure Plan: Designed as an interactive single-page MP3 audio application. Features a header, vinyl turntable music player card with canvas audio visualizer, full playback controls, speed controller, progress & volume sliders, drag-and-drop MP3 uploader with IndexedDB offline storage, search/filter playlist controls, and modal confirmation dialogs. -->
+<!-- Visualization & Content Choices: Interactive HTML5 Canvas for real-time audio frequency visualizer, HTML/CSS for UI components, FontAwesome web fonts for UI icons. Zero SVG tags used. Zero Mermaid JS used. -->
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>My Little MP3 Player</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: #fff5f7;
+            color: #5c5254;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track {
+            background: #fff0f3;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ffb3c1;
+            border-radius: 4px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 182, 193, 0.45);
+            box-shadow: 0 10px 30px rgba(255, 182, 193, 0.22);
+        }
+
+        .pink-gradient {
+            background: linear-gradient(135deg, #ffccd5 0%, #ffb3c1 50%, #ff8fa3 100%);
+        }
+
+        .vinyl-spin { animation: spin 10s linear infinite; }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .paused { animation-play-state: paused; }
+
+        input[type="range"] { accent-color: #ff758c; }
+
+        .vinyl {
+            background:
+                repeating-radial-gradient(
+                    circle at center,
+                    #191719 0px,
+                    #191719 2px,
+                    #242124 3px,
+                    #191719 4px
+                );
+            box-shadow:
+                0 8px 20px rgba(0, 0, 0, 0.25),
+                inset 0 0 0 1px rgba(255,255,255,0.08);
+        }
+
+        .vinyl::after {
+            content: "";
+            position: absolute;
+            inset: 8%;
+            border-radius: 50%;
+            background: linear-gradient(
+                135deg,
+                rgba(255,255,255,0.12),
+                transparent 35%,
+                transparent 65%,
+                rgba(255,255,255,0.04)
+            );
+            pointer-events: none;
+        }
+
+        .record-label {
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid rgba(255,255,255,0.85);
+            box-shadow:
+                0 2px 8px rgba(0,0,0,0.25),
+                0 0 0 2px rgba(255,255,255,0.12);
+            position: relative;
+            z-index: 2;
+            background: #fff;
+        }
+
+        .record-label img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .record-hole {
+            position: absolute;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #f7f7f7;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 3;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.18);
+        }
+
+        .drag-over {
+            border-color: #ff477e !important;
+            background-color: #ffe6ea !important;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center justify-start py-4 px-3 sm:py-8">
+
+    <div class="w-full max-w-[390px] flex flex-col gap-4 pb-12"
+         style="padding-bottom: calc(3rem + env(safe-area-inset-bottom));">
+
+        <header class="text-center flex flex-col items-center gap-1 mt-1">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/80 border border-pink-200 text-xs text-pink-500 font-semibold shadow-xs">
+                <i class="fa-solid fa-compact-disc"></i>
+                My Little Music Player
+            </div>
+            <h1 class="text-xl font-bold text-[#6b5b5e] tracking-tight">
+                my favorite songs
+            </h1>
+        </header>
+
+        <div class="glass-card rounded-3xl p-5 flex flex-col items-center gap-4 relative overflow-hidden">
+
+            <div class="relative w-48 h-48 sm:w-52 sm:h-52 rounded-2xl pink-gradient flex items-center justify-center shadow-inner overflow-hidden border-4 border-white">
+
+                <canvas id="audio-visualizer"
+                        class="absolute inset-0 w-full h-full opacity-60 pointer-events-none"></canvas>
+
+                <div id="vinyl-disc"
+                     class="vinyl absolute w-40 h-40 sm:w-44 sm:h-44 rounded-full flex items-center justify-center vinyl-spin paused">
+
+                    <div class="record-label">
+                        <img src="https://i.postimg.cc/13GYHhWh/IMG-6994.jpg" alt="Album artwork">
+                    </div>
+
+                    <div class="record-hole"></div>
+                </div>
+            </div>
+
+            <div class="w-full text-center px-2">
+                <h2 id="current-title" class="text-base font-bold text-[#5c5254] truncate w-full">
+                    No song selected
+                </h2>
+                <p id="current-artist" class="text-xs text-pink-400/90 truncate mt-0.5">
+                    Upload mp3 to start
+                </p>
+            </div>
+
+            <div class="w-full flex flex-col gap-1">
+                <input type="range" id="progress-bar" value="0" max="100"
+                       class="w-full h-1.5 bg-pink-100 rounded-lg appearance-none cursor-pointer">
+                <div class="flex justify-between text-[11px] text-pink-400 font-medium px-0.5">
+                    <span id="current-time">00:00</span>
+                    <span id="total-duration">00:00</span>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-center gap-5 my-1">
+                <button id="prev-btn"
+                        class="w-10 h-10 rounded-full bg-white text-pink-400 border border-pink-200 flex items-center justify-center shadow-sm hover:bg-pink-50 active:scale-95 transition"
+                        title="Previous Track">
+                    <i class="fa-solid fa-backward-step"></i>
+                </button>
+
+                <button id="play-pause-btn"
+                        class="w-14 h-14 rounded-full pink-gradient text-white flex items-center justify-center shadow-lg hover:opacity-95 active:scale-95 transition text-lg"
+                        title="Play / Pause">
+                    <i id="play-icon" class="fa-solid fa-play ml-0.5"></i>
+                </button>
+
+                <button id="next-btn"
+                        class="w-10 h-10 rounded-full bg-white text-pink-400 border border-pink-200 flex items-center justify-center shadow-sm hover:bg-pink-50 active:scale-95 transition"
+                        title="Next Track">
+                    <i class="fa-solid fa-forward-step"></i>
+                </button>
+            </div>
+
+            <div class="w-full flex items-center justify-between px-2 pt-2 border-t border-pink-100/60">
+                <div class="flex items-center gap-3">
+                    <button id="shuffle-btn"
+                            class="text-pink-300 hover:text-pink-500 transition text-sm"
+                            title="Shuffle Mode">
+                        <i class="fa-solid fa-shuffle"></i>
+                    </button>
+
+                    <button id="repeat-btn"
+                            class="text-pink-300 hover:text-pink-500 transition text-sm relative"
+                            title="Repeat Mode">
+                        <i class="fa-solid fa-repeat"></i>
+                        <span id="repeat-indicator"
+                              class="text-[9px] font-bold absolute -mt-2 ml-2 text-pink-500"></span>
+                    </button>
+
+                    <button id="speed-btn"
+                            class="text-xs font-bold text-pink-400 hover:text-pink-600 px-1.5 py-0.5 rounded-md bg-pink-50 border border-pink-200 transition"
+                            title="Playback Speed">
+                        1.0x
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-volume-high text-pink-300 text-xs"></i>
+                    <input type="range" id="volume-bar" min="0" max="1" step="0.05" value="1"
+                           class="w-20 h-1.5 bg-pink-100 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card rounded-3xl p-4 flex flex-col gap-3" id="drop-zone">
+
+            <div class="flex items-center justify-between px-1">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-pink-400">♡</span>
+                    <h3 class="font-bold text-sm text-[#6b5b5e]">My Playlist</h3>
+                </div>
+                <span id="storage-status" class="text-[11px] text-pink-400/90 font-medium">
+                    0 songs · 0.0 MB
+                </span>
+            </div>
+
+            <div class="relative w-full">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-pink-300"></i>
+                <input type="text" id="search-input" placeholder="Search song title..."
+                       class="w-full pl-8 pr-3 py-1.5 text-xs bg-white/70 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-400 text-[#5c5254]">
+            </div>
+
+            <label class="w-full py-3 px-4 rounded-2xl border-2 border-dashed border-pink-300 bg-pink-50/50 hover:bg-pink-50 text-pink-500 font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer transition active:scale-98 shadow-2xs">
+                <i class="fa-solid fa-plus-circle text-sm"></i>
+                <span>Add or Drag MP3 Songs Here</span>
+                <input type="file" id="mp3-upload-input"
+                       accept="audio/mpeg,audio/mp3,audio/*" multiple class="hidden">
+            </label>
+
+            <div id="playlist-container" class="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
+                <div id="empty-playlist"
+                     class="flex flex-col items-center justify-center py-8 text-center text-pink-300/80">
+                    <span class="text-2xl mb-1">♡</span>
+                    <p class="text-xs font-medium text-pink-400">Your playlist is empty</p>
+                    <p class="text-[11px] text-pink-300 mt-0.5">Add your favorite MP3s to begin listening.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-modal"
+         class="fixed inset-0 bg-black/30 backdrop-blur-xs flex items-center justify-center z-50 hidden px-4">
+        <div class="glass-card rounded-3xl p-6 w-full max-w-[280px] flex flex-col items-center text-center shadow-xl">
+            <div class="w-12 h-12 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center text-xl mb-3">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <h3 class="font-bold text-sm text-[#5c5254] mb-1">Delete this song?</h3>
+            <p id="delete-song-name" class="text-xs text-pink-400 mb-5 line-clamp-1">Song title</p>
+            <div class="flex gap-2 w-full">
+                <button id="modal-cancel-btn"
+                        class="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-semibold transition">
+                    Cancel
+                </button>
+                <button id="modal-delete-btn"
+                        class="flex-1 py-2.5 rounded-xl bg-pink-400 hover:bg-pink-500 text-white text-xs font-semibold transition">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert-modal"
+         class="fixed inset-0 bg-black/30 backdrop-blur-xs flex items-center justify-center z-50 hidden px-4">
+        <div class="glass-card rounded-3xl p-6 w-full max-w-[280px] flex flex-col items-center text-center shadow-xl">
+            <div class="w-12 h-12 rounded-full bg-red-50 text-red-400 flex items-center justify-center text-xl mb-3">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="font-bold text-sm text-[#5c5254] mb-1">Playback Error</h3>
+            <p id="alert-msg" class="text-xs text-pink-400 mb-5">This song couldn't be played.</p>
+            <button id="alert-ok-btn"
+                    class="w-full py-2.5 rounded-xl bg-pink-400 hover:bg-pink-500 text-white text-xs font-semibold transition">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const DB_NAME = 'MyLittleMusicDB';
+        const STORE_NAME = 'tracks';
+        const DB_VERSION = 1;
+        let db = null;
+
+        let tracks = [];
+        let currentTrackId = localStorage.getItem('mlmp_last_track_id') || null;
+        let isPlaying = false;
+        let volume = parseFloat(localStorage.getItem('mlmp_volume')) || 1.0;
+        let shuffleMode = localStorage.getItem('mlmp_shuffle') === 'true';
+        let repeatMode = localStorage.getItem('mlmp_repeat') || 'none';
+        let playbackSpeed = parseFloat(localStorage.getItem('mlmp_speed')) || 1.0;
+
+        const speeds = [0.8, 1.0, 1.25, 1.5, 2.0];
+
+        const audioElement = new Audio();
+        audioElement.volume = volume;
+        audioElement.playbackRate = playbackSpeed;
+
+        let audioCtx = null;
+        let analyser = null;
+        let sourceNode = null;
+        let visualizerAnimId = null;
+
+        let currentObjectURL = null;
+        let songToDeleteId = null;
+
+        const uploadInput = document.getElementById('mp3-upload-input');
+        const playlistContainer = document.getElementById('playlist-container');
+        const emptyPlaylist = document.getElementById('empty-playlist');
+        const currentTitle = document.getElementById('current-title');
+        const currentArtist = document.getElementById('current-artist');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const playIcon = document.getElementById('play-icon');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const currentTimeEl = document.getElementById('current-time');
+        const totalDurationEl = document.getElementById('total-duration');
+        const volumeBar = document.getElementById('volume-bar');
+        const shuffleBtn = document.getElementById('shuffle-btn');
+        const repeatBtn = document.getElementById('repeat-btn');
+        const repeatIndicator = document.getElementById('repeat-indicator');
+        const speedBtn = document.getElementById('speed-btn');
+        const storageStatus = document.getElementById('storage-status');
+        const vinylDisc = document.getElementById('vinyl-disc');
+        const searchInput = document.getElementById('search-input');
+        const dropZone = document.getElementById('drop-zone');
+        const canvas = document.getElementById('audio-visualizer');
+        const canvasCtx = canvas.getContext('2d');
+
+        const deleteModal = document.getElementById('delete-modal');
+        const deleteSongName = document.getElementById('delete-song-name');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
+        const modalDeleteBtn = document.getElementById('modal-delete-btn');
+        const alertModal = document.getElementById('alert-modal');
+        const alertMsg = document.getElementById('alert-msg');
+        const alertOkBtn = document.getElementById('alert-ok-btn');
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onerror = event => reject(event.target.error);
+
+                request.onsuccess = event => {
+                    db = event.target.result;
+                    resolve(db);
+                };
+
+                request.onupgradeneeded = event => {
+                    const database = event.target.result;
+
+                    if (!database.objectStoreNames.contains(STORE_NAME)) {
+                        database.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                };
+            });
+        }
+
+        function getAllTracksFromDB() {
+            return new Promise((resolve, reject) => {
+                if (!db) return reject(new Error('Database not initialized'));
+
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+
+                request.onsuccess = () => resolve(request.result || []);
+                request.onerror = event => reject(event.target.error);
+            });
+        }
+
+        function saveTrackToDB(trackData) {
+            return new Promise((resolve, reject) => {
+                if (!db) return reject(new Error('Database not initialized'));
+
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+
+                store.put(trackData);
+
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = event => reject(event.target.error);
+            });
+        }
+
+        function deleteTrackFromDB(id) {
+            return new Promise((resolve, reject) => {
+                if (!db) return reject(new Error('Database not initialized'));
+
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+
+                store.delete(id);
+
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = event => reject(event.target.error);
+            });
+        }
+
+        function formatTime(seconds) {
+            if (isNaN(seconds) || seconds < 0) return '00:00';
+
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+
+            return mins.toString().padStart(2, '0') + ':' +
+                   secs.toString().padStart(2, '0');
+        }
+
+        function cleanSongName(filename) {
+            return filename.replace(/\.[^/.]+$/, '');
+        }
+
+        function updateStorageStatus() {
+            const count = tracks.length;
+
+            const totalBytes = tracks.reduce(
+                (acc, track) => acc + (track.size || 0),
+                0
+            );
+
+            const sizeMB = (totalBytes / (1024 * 1024)).toFixed(1);
+
+            storageStatus.textContent =
+                `${count} songs · ${sizeMB} MB`;
+        }
+
+        function updateControlUI() {
+            if (shuffleMode) {
+                shuffleBtn.classList.remove('text-pink-300');
+                shuffleBtn.classList.add('text-pink-500', 'font-bold');
+            } else {
+                shuffleBtn.classList.remove('text-pink-500', 'font-bold');
+                shuffleBtn.classList.add('text-pink-300');
+            }
+
+            if (repeatMode === 'one') {
+                repeatBtn.classList.remove('text-pink-300');
+                repeatBtn.classList.add('text-pink-500');
+                repeatIndicator.textContent = '1';
+            } else if (repeatMode === 'all') {
+                repeatBtn.classList.remove('text-pink-300');
+                repeatBtn.classList.add('text-pink-500');
+                repeatIndicator.textContent = 'ALL';
+            } else {
+                repeatBtn.classList.remove('text-pink-500');
+                repeatBtn.classList.add('text-pink-300');
+                repeatIndicator.textContent = '';
+            }
+
+            speedBtn.textContent = `${playbackSpeed.toFixed(1)}x`;
+            volumeBar.value = volume;
+        }
+
+        function showCustomAlert(msg) {
+            alertMsg.textContent = msg;
+            alertModal.classList.remove('hidden');
+        }
+
+        function initAudioVisualizer() {
+            if (audioCtx) return;
+
+            try {
+                const AudioContext =
+                    window.AudioContext || window.webkitAudioContext;
+
+                audioCtx = new AudioContext();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 64;
+
+                sourceNode =
+                    audioCtx.createMediaElementSource(audioElement);
+
+                sourceNode.connect(analyser);
+                analyser.connect(audioCtx.destination);
+            } catch (err) {
+                console.log('Audio visualizer initialization skipped:', err);
+            }
+        }
+
+        function drawVisualizer() {
+            visualizerAnimId = requestAnimationFrame(drawVisualizer);
+
+            if (!analyser || !isPlaying) {
+                canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+                return;
+            }
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            analyser.getByteFrequencyData(dataArray);
+
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const barWidth =
+                (canvas.width / bufferLength) * 1.5;
+
+            let x = 0;
+
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight =
+                    (dataArray[i] / 255) *
+                    canvas.height *
+                    0.8;
+
+                canvasCtx.fillStyle =
+                    `rgba(255,255,255,${
+                        0.2 + (dataArray[i] / 255) * 0.6
+                    })`;
+
+                canvasCtx.fillRect(
+                    x,
+                    canvas.height - barHeight,
+                    barWidth - 2,
+                    barHeight
+                );
+
+                x += barWidth;
+            }
+        }
+
+        function resizeCanvas() {
+            if (!canvas || !canvas.parentElement) return;
+
+            canvas.width =
+                canvas.parentElement.clientWidth;
+
+            canvas.height =
+                canvas.parentElement.clientHeight;
+        }
+
+        function renderPlaylist() {
+            playlistContainer.innerHTML = '';
+
+            const query =
+                searchInput.value.toLowerCase().trim();
+
+            const filteredTracks =
+                tracks.filter(track =>
+                    cleanSongName(track.name)
+                        .toLowerCase()
+                        .includes(query)
+                );
+
+            if (tracks.length === 0) {
+                playlistContainer.appendChild(emptyPlaylist);
+                emptyPlaylist.classList.remove('hidden');
+
+                currentTitle.textContent =
+                    'No song selected';
+
+                currentArtist.textContent =
+                    'Upload mp3 to start';
+
+                currentTimeEl.textContent = '00:00';
+                totalDurationEl.textContent = '00:00';
+                progressBar.value = 0;
+
+                updateStorageStatus();
+                return;
+            }
+
+            emptyPlaylist.classList.add('hidden');
+
+            if (filteredTracks.length === 0) {
+                const noResult = document.createElement('div');
+
+                noResult.className =
+                    'text-center py-6 text-xs text-pink-300 font-medium';
+
+                noResult.textContent =
+                    'No matching songs found';
+
+                playlistContainer.appendChild(noResult);
+                updateStorageStatus();
+                return;
+            }
+
+            filteredTracks.forEach(track => {
+                const isCurrent =
+                    track.id === currentTrackId;
+
+                const div =
+                    document.createElement('div');
+
+                div.className =
+                    `flex items-center justify-between p-2.5 rounded-2xl transition border ${
+                        isCurrent
+                            ? 'bg-pink-100/80 border-pink-300 shadow-2xs'
+                            : 'bg-white/60 border-pink-100 hover:bg-pink-50/50'
+                    }`;
+
+                div.innerHTML = `
+                    <div class="flex items-center gap-3 overflow-hidden cursor-pointer flex-1 mr-2"
+                         onclick="playTrack('${track.id}')">
+
+                        <div class="w-9 h-9 rounded-xl ${
+                            isCurrent
+                                ? 'pink-gradient text-white'
+                                : 'bg-pink-50 text-pink-400'
+                        } flex items-center justify-center shrink-0 shadow-xs">
+
+                            <i class="fa-solid ${
+                                isCurrent && isPlaying
+                                    ? 'fa-volume-high animate-pulse'
+                                    : 'fa-music'
+                            } text-xs"></i>
+                        </div>
+
+                        <div class="overflow-hidden">
+
+                            <h4 class="text-xs font-bold ${
+                                isCurrent
+                                    ? 'text-pink-600'
+                                    : 'text-[#5c5254]'
+                            } truncate">
+
+                                ${cleanSongName(track.name)}
+
+                            </h4>
+
+                            <p class="text-[10px] text-pink-400/80 truncate">
+                                ${(track.size / (1024 * 1024)).toFixed(1)} MB
+                            </p>
+
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-1 shrink-0">
+
+                        <button
+                            onclick="openDeleteModal('${track.id}', event)"
+                            class="w-8 h-8 rounded-xl text-pink-300 hover:text-red-400 hover:bg-red-50 flex items-center justify-center transition"
+                            title="Delete">
+
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+
+                        </button>
+
+                    </div>
+                `;
+
+                playlistContainer.appendChild(div);
+            });
+
+            updateStorageStatus();
+        }
+
+        async function playTrack(id) {
+            const track =
+                tracks.find(t => t.id === id);
+
+            if (!track) return;
+
+            initAudioVisualizer();
+
+            if (audioCtx &&
+                audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            currentTrackId = id;
+
+            localStorage.setItem(
+                'mlmp_last_track_id',
+                id
+            );
+
+            if (currentObjectURL) {
+                URL.revokeObjectURL(
+                    currentObjectURL
+                );
+            }
+
+            currentObjectURL =
+                URL.createObjectURL(
+                    track.blob
+                );
+
+            audioElement.src =
+                currentObjectURL;
+
+            audioElement.playbackRate =
+                playbackSpeed;
+
+            currentTitle.textContent =
+                cleanSongName(track.name);
+
+            currentArtist.textContent =
+                'My Playlist';
+
+            try {
+                await audioElement.play();
+
+                isPlaying = true;
+
+                playIcon.className =
+                    'fa-solid fa-pause';
+
+                vinylDisc.classList.remove(
+                    'paused'
+                );
+
+                drawVisualizer();
+
+                renderPlaylist();
+
+            } catch (err) {
+                console.error(
+                    'Playback error:',
+                    err
+                );
+
+                showCustomAlert(
+                    'This song couldn’t be played or format is not supported.'
+                );
+
+                isPlaying = false;
+
+                playIcon.className =
+                    'fa-solid fa-play';
+
+                vinylDisc.classList.add(
+                    'paused'
+                );
+            }
+        }
+
+        function togglePlayPause() {
+            if (tracks.length === 0) return;
+
+            initAudioVisualizer();
+
+            if (audioCtx &&
+                audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            if (!currentTrackId) {
+                playTrack(tracks[0].id);
+                return;
+            }
+
+            if (isPlaying) {
+                audioElement.pause();
+
+                isPlaying = false;
+
+                playIcon.className =
+                    'fa-solid fa-play';
+
+                vinylDisc.classList.add(
+                    'paused'
+                );
+
+                renderPlaylist();
+
+            } else {
+                audioElement.play()
+                    .then(() => {
+
+                        isPlaying = true;
+
+                        playIcon.className =
+                            'fa-solid fa-pause';
+
+                        vinylDisc.classList.remove(
+                            'paused'
+                        );
+
+                        drawVisualizer();
+                        renderPlaylist();
+
+                    })
+                    .catch(() => {
+
+                        showCustomAlert(
+                            'Playback error occurred.'
+                        );
+
+                    });
+            }
+        }
+
+        function playNextTrack() {
+            if (tracks.length === 0) return;
+
+            let nextIndex = 0;
+
+            if (shuffleMode) {
+
+                nextIndex =
+                    Math.floor(
+                        Math.random() *
+                        tracks.length
+                    );
+
+                if (
+                    tracks.length > 1 &&
+                    tracks[nextIndex].id === currentTrackId
+                ) {
+                    nextIndex =
+                        (nextIndex + 1) %
+                        tracks.length;
+                }
+
+            } else {
+
+                const currentIndex =
+                    tracks.findIndex(
+                        t => t.id === currentTrackId
+                    );
+
+                if (currentIndex !== -1) {
+                    nextIndex =
+                        (currentIndex + 1) %
+                        tracks.length;
+                }
+            }
+
+            playTrack(
+                tracks[nextIndex].id
+            );
+        }
+
+        function playPrevTrack() {
+            if (tracks.length === 0) return;
+
+            const currentIndex =
+                tracks.findIndex(
+                    t => t.id === currentTrackId
+                );
+
+            let prevIndex =
+                currentIndex - 1;
+
+            if (prevIndex < 0) {
+                prevIndex =
+                    tracks.length - 1;
+            }
+
+            playTrack(
+                tracks[prevIndex].id
+            );
+        }
+
+        async function processFiles(files) {
+            if (!files || files.length === 0) return;
+
+            for (let i = 0; i < files.length; i++) {
+
+                const file = files[i];
+
+                if (
+                    !file.type.startsWith('audio/') &&
+                    !file.name.toLowerCase().endsWith('.mp3')
+                ) {
+                    continue;
+                }
+
+                const newTrack = {
+                    id:
+                        'track_' +
+                        Date.now() +
+                        '_' +
+                        Math.random()
+                            .toString(36)
+                            .substring(2, 9),
+
+                    name: file.name,
+                    size: file.size,
+                    blob: file
+                };
+
+                try {
+                    await saveTrackToDB(
+                        newTrack
+                    );
+
+                    tracks.push(
+                        newTrack
+                    );
+
+                } catch (err) {
+                    console.error(
+                        'Failed to save track:',
+                        err
+                    );
+                }
+            }
+
+            renderPlaylist();
+
+            if (
+                !currentTrackId &&
+                tracks.length > 0
+            ) {
+                currentTrackId =
+                    tracks[0].id;
+
+                renderPlaylist();
+            }
+        }
+
+        playPauseBtn.addEventListener(
+            'click',
+            togglePlayPause
+        );
+
+        nextBtn.addEventListener(
+            'click',
+            playNextTrack
+        );
+
+        prevBtn.addEventListener(
+            'click',
+            playPrevTrack
+        );
+
+        audioElement.addEventListener(
+            'loadedmetadata',
+            () => {
+                totalDurationEl.textContent =
+                    formatTime(
+                        audioElement.duration
+                    );
+            }
+        );
+
+        audioElement.addEventListener(
+            'timeupdate',
+            () => {
+
+                if (
+                    !isNaN(audioElement.duration) &&
+                    audioElement.duration > 0
+                ) {
+
+                    const progressPercent =
+                        (
+                            audioElement.currentTime /
+                            audioElement.duration
+                        ) * 100;
+
+                    progressBar.value =
+                        progressPercent;
+
+                    currentTimeEl.textContent =
+                        formatTime(
+                            audioElement.currentTime
+                        );
+
+                    totalDurationEl.textContent =
+                        formatTime(
+                            audioElement.duration
+                        );
+                }
+            }
+        );
+
+        audioElement.addEventListener(
+            'ended',
+            () => {
+
+                if (repeatMode === 'one') {
+
+                    audioElement.currentTime = 0;
+                    audioElement.play();
+
+                } else {
+
+                    const currentIndex =
+                        tracks.findIndex(
+                            t => t.id === currentTrackId
+                        );
+
+                    if (
+                        repeatMode === 'none' &&
+                        currentIndex === tracks.length - 1
+                    ) {
+
+                        isPlaying = false;
+
+                        playIcon.className =
+                            'fa-solid fa-play';
+
+                        vinylDisc.classList.add(
+                            'paused'
+                        );
+
+                        renderPlaylist();
+
+                    } else {
+
+                        playNextTrack();
+
+                    }
+                }
+            }
+        );
+
+        progressBar.addEventListener(
+            'input',
+            e => {
+
+                if (
+                    !isNaN(audioElement.duration)
+                ) {
+
+                    const seekTime =
+                        (
+                            e.target.value /
+                            100
+                        ) *
+                        audioElement.duration;
+
+                    audioElement.currentTime =
+                        seekTime;
+                }
+            }
+        );
+
+        volumeBar.addEventListener(
+            'input',
+            e => {
+
+                volume =
+                    parseFloat(
+                        e.target.value
+                    );
+
+                audioElement.volume =
+                    volume;
+
+                localStorage.setItem(
+                    'mlmp_volume',
+                    volume
+                );
+            }
+        );
+
+        shuffleBtn.addEventListener(
+            'click',
+            () => {
+
+                shuffleMode =
+                    !shuffleMode;
+
+                localStorage.setItem(
+                    'mlmp_shuffle',
+                    shuffleMode
+                );
+
+                updateControlUI();
+            }
+        );
+
+        repeatBtn.addEventListener(
+            'click',
+            () => {
+
+                if (repeatMode === 'none') {
+                    repeatMode = 'all';
+                } else if (repeatMode === 'all') {
+                    repeatMode = 'one';
+                } else {
+                    repeatMode = 'none';
+                }
+
+                localStorage.setItem(
+                    'mlmp_repeat',
+                    repeatMode
+                );
+
+                updateControlUI();
+            }
+        );
+
+        speedBtn.addEventListener(
+            'click',
+            () => {
+
+                const currentIdx =
+                    speeds.indexOf(
+                        playbackSpeed
+                    );
+
+                const nextIdx =
+                    (currentIdx + 1) %
+                    speeds.length;
+
+                playbackSpeed =
+                    speeds[nextIdx];
+
+                audioElement.playbackRate =
+                    playbackSpeed;
+
+                localStorage.setItem(
+                    'mlmp_speed',
+                    playbackSpeed
+                );
+
+                updateControlUI();
+            }
+        );
+
+        searchInput.addEventListener(
+            'input',
+            renderPlaylist
+        );
+
+        uploadInput.addEventListener(
+            'change',
+            e => {
+
+                processFiles(
+                    e.target.files
+                );
+
+                uploadInput.value = '';
+            }
+        );
+
+        ['dragenter', 'dragover'].forEach(
+            eventName => {
+
+                dropZone.addEventListener(
+                    eventName,
+                    e => {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        dropZone.classList.add(
+                            'drag-over'
+                        );
+
+                    }
+                );
+            }
+        );
+
+        ['dragleave', 'drop'].forEach(
+            eventName => {
+
+                dropZone.addEventListener(
+                    eventName,
+                    e => {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        dropZone.classList.remove(
+                            'drag-over'
+                        );
+
+                    }
+                );
+            }
+        );
+
+        dropZone.addEventListener(
+            'drop',
+            e => {
+
+                const files =
+                    e.dataTransfer.files;
+
+                processFiles(files);
+            }
+        );
+
+        window.openDeleteModal =
+            function(id, event) {
+
+                if (event) {
+                    event.stopPropagation();
+                }
+
+                songToDeleteId = id;
+
+                const track =
+                    tracks.find(
+                        t => t.id === id
+                    );
+
+                if (track) {
+
+                    deleteSongName.textContent =
+                        cleanSongName(
+                            track.name
+                        );
+
+                    deleteModal.classList.remove(
+                        'hidden'
+                    );
+                }
+            };
+
+        modalCancelBtn.addEventListener(
+            'click',
+            () => {
+
+                songToDeleteId = null;
+
+                deleteModal.classList.add(
+                    'hidden'
+                );
+            }
+        );
+
+        modalDeleteBtn.addEventListener(
+            'click',
+            async () => {
+
+                if (!songToDeleteId) return;
+
+                try {
+
+                    const deletingId =
+                        songToDeleteId;
+
+                    await deleteTrackFromDB(
+                        deletingId
+                    );
+
+                    tracks =
+                        tracks.filter(
+                            t =>
+                                t.id !==
+                                deletingId
+                        );
+
+                    if (
+                        currentTrackId ===
+                        deletingId
+                    ) {
+
+                        audioElement.pause();
+
+                        isPlaying = false;
+
+                        currentTrackId = null;
+
+                        localStorage.removeItem(
+                            'mlmp_last_track_id'
+                        );
+
+                        if (currentObjectURL) {
+
+                            URL.revokeObjectURL(
+                                currentObjectURL
+                            );
+
+                            currentObjectURL =
+                                null;
+                        }
+
+                        audioElement.src = '';
+
+                        playIcon.className =
+                            'fa-solid fa-play';
+
+                        vinylDisc.classList.add(
+                            'paused'
+                        );
+
+                        if (tracks.length > 0) {
+
+                            currentTrackId =
+                                tracks[0].id;
+
+                            localStorage.setItem(
+                                'mlmp_last_track_id',
+                                currentTrackId
+                            );
+
+                            const nextTrack =
+                                tracks[0];
+
+                            currentObjectURL =
+                                URL.createObjectURL(
+                                    nextTrack.blob
+                                );
+
+                            audioElement.src =
+                                currentObjectURL;
+
+                            currentTitle.textContent =
+                                cleanSongName(
+                                    nextTrack.name
+                                );
+
+                            currentArtist.textContent =
+                                'My Playlist';
+                        } else {
+
+                            currentTitle.textContent =
+                                'No song selected';
+
+                            currentArtist.textContent =
+                                'Upload mp3 to start';
+
+                            currentTimeEl.textContent =
+                                '00:00';
+
+                            totalDurationEl.textContent =
+                                '00:00';
+
+                            progressBar.value = 0;
+                        }
+                    }
+
+                    deleteModal.classList.add(
+                        'hidden'
+                    );
+
+                    songToDeleteId = null;
+
+                    renderPlaylist();
+
+                } catch (err) {
+
+                    console.error(
+                        'Failed to delete track:',
+                        err
+                    );
+
+                    showCustomAlert(
+                        'Could not delete song.'
+                    );
+                }
+            }
+        );
+
+        alertOkBtn.addEventListener(
+            'click',
+            () => {
+
+                alertModal.classList.add(
+                    'hidden'
+                );
+            }
+        );
+
+        window.addEventListener(
+            'resize',
+            resizeCanvas
+        );
+
+        window.addEventListener(
+            'DOMContentLoaded',
+            async () => {
+
+                resizeCanvas();
+
+                try {
+
+                    await initDB();
+
+                    tracks =
+                        await getAllTracksFromDB();
+
+                    updateControlUI();
+
+                    renderPlaylist();
+
+                    if (
+                        currentTrackId &&
+                        tracks.some(
+                            t =>
+                                t.id ===
+                                currentTrackId
+                        )
+                    ) {
+
+                        const track =
+                            tracks.find(
+                                t =>
+                                    t.id ===
+                                    currentTrackId
+                            );
+
+                        if (track) {
+
+                            currentObjectURL =
+                                URL.createObjectURL(
+                                    track.blob
+                                );
+
+                            audioElement.src =
+                                currentObjectURL;
+
+                            audioElement.playbackRate =
+                                playbackSpeed;
+
+                            currentTitle.textContent =
+                                cleanSongName(
+                                    track.name
+                                );
+
+                            currentArtist.textContent =
+                                'My Playlist';
+                        }
+
+                    } else if (
+                        tracks.length > 0
+                    ) {
+
+                        currentTrackId =
+                            tracks[0].id;
+
+                        localStorage.setItem(
+                            'mlmp_last_track_id',
+                            currentTrackId
+                        );
+
+                        const track =
+                            tracks[0];
+
+                        currentObjectURL =
+                            URL.createObjectURL(
+                                track.blob
+                            );
+
+                        audioElement.src =
+                            currentObjectURL;
+
+                        audioElement.playbackRate =
+                            playbackSpeed;
+
+                        currentTitle.textContent =
+                            cleanSongName(
+                                track.name
+                            );
+
+                        currentArtist.textContent =
+                            'My Playlist';
+                    }
+
+                } catch (err) {
+
+                    console.error(
+                        'Initialization error:',
+                        err
+                    );
+
+                    showCustomAlert(
+                        'Failed to load music database.'
+                    );
+                }
+            }
+        );
+    </script>
+</body>
+</html>
