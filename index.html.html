@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>My Little MP3 Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+        body { font-family:'Quicksand',sans-serif; background:#fff5f7; color:#5c5254; user-select:none; -webkit-tap-highlight-color:transparent; }
+        ::-webkit-scrollbar{width:4px} ::-webkit-scrollbar-track{background:#fff0f3;border-radius:4px} ::-webkit-scrollbar-thumb{background:#ffb3c1;border-radius:4px}
+        .glass-card{background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border:1px solid rgba(255,182,193,.4);box-shadow:0 10px 30px rgba(255,182,193,.2)}
+        .pink-gradient{background:linear-gradient(135deg,#ffccd5 0%,#ffb3c1 50%,#ff8fa3 100%)}
+        .vinyl-spin{animation:spin 10s linear infinite}@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}} .paused{animation-play-state:paused}
+        input[type=range]{accent-color:#ff758c}
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start py-4 px-3 sm:py-8">
+<div class="w-full max-w-[380px] flex flex-col gap-4 pb-12" style="padding-bottom:calc(3rem + env(safe-area-inset-bottom));">
+<header class="text-center flex flex-col items-center gap-1 mt-1">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-pink-200 text-xs text-pink-500 font-semibold shadow-xs"><span>🎀</span> My Little Music Player <span>🎀</span></div>
+<h1 class="text-xl font-bold text-[#6b5b5e] tracking-tight">my favorite songs ♡</h1>
+</header>
+<div class="glass-card rounded-3xl p-5 flex flex-col items-center gap-4 relative overflow-hidden">
+<div class="absolute -top-1 -right-1 text-pink-300 opacity-80 text-xl pointer-events-none">🎀</div>
+<div class="relative w-44 h-44 sm:w-48 sm:h-48 rounded-2xl pink-gradient flex items-center justify-center shadow-inner overflow-hidden border-4 border-white">
+<div id="vinyl-disc" class="absolute w-38 h-38 sm:w-42 sm:h-42 rounded-full border-8 border-dashed border-white/30 flex items-center justify-center vinyl-spin paused"><div class="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-md"><i class="fa-solid fa-music text-pink-400 text-lg"></i></div></div>
+<div class="absolute inset-0 flex flex-col items-center justify-center text-white/90 bg-black/10 backdrop-blur-[2px]"><span class="text-3xl mb-1">🍓</span><span class="text-xs font-semibold tracking-wider uppercase">Coquette Audio</span></div>
+</div>
+<div class="w-full text-center px-2"><h2 id="current-title" class="text-base font-bold text-[#5c5254] truncate w-full">No song selected ♡</h2><p id="current-artist" class="text-xs text-pink-400/80 truncate mt-0.5">Upload mp3 to start</p></div>
+<div class="w-full flex flex-col gap-1"><input type="range" id="progress-bar" value="0" max="100" class="w-full h-1.5 bg-pink-100 rounded-lg appearance-none cursor-pointer"><div class="flex justify-between text-[11px] text-pink-400 font-medium px-0.5"><span id="current-time">00:00</span><span id="total-duration">00:00</span></div></div>
+<div class="flex items-center justify-center gap-5 my-1">
+<button id="prev-btn" class="w-10 h-10 rounded-full bg-white text-pink-400 border border-pink-200 flex items-center justify-center shadow-sm hover:bg-pink-50 active:scale-95 transition"><i class="fa-solid fa-backward-step"></i></button>
+<button id="play-pause-btn" class="w-14 h-14 rounded-full pink-gradient text-white flex items-center justify-center shadow-lg hover:opacity-95 active:scale-95 transition text-lg"><i id="play-icon" class="fa-solid fa-play ml-0.5"></i></button>
+<button id="next-btn" class="w-10 h-10 rounded-full bg-white text-pink-400 border border-pink-200 flex items-center justify-center shadow-sm hover:bg-pink-50 active:scale-95 transition"><i class="fa-solid fa-forward-step"></i></button>
+</div>
+<div class="w-full flex items-center justify-between px-2 pt-1 border-t border-pink-100/60">
+<div class="flex items-center gap-3"><button id="shuffle-btn" class="text-pink-300 hover:text-pink-500 transition text-sm" title="Shuffle"><i class="fa-solid fa-shuffle"></i></button><button id="repeat-btn" class="text-pink-300 hover:text-pink-500 transition text-sm" title="Repeat Mode"><i class="fa-solid fa-repeat"></i><span id="repeat-indicator" class="text-[9px] font-bold absolute -mt-2 ml-2 text-pink-500"></span></button></div>
+<div class="flex items-center gap-2"><i class="fa-solid fa-volume-high text-pink-300 text-xs"></i><input type="range" id="volume-bar" min="0" max="1" step="0.05" value="1" class="w-20 h-1.5 bg-pink-100 rounded-lg appearance-none cursor-pointer"></div>
+</div>
+</div>
+<div class="glass-card rounded-3xl p-4 flex flex-col gap-3">
+<div class="flex items-center justify-between px-1"><div class="flex items-center gap-1.5"><span class="text-pink-400">♡</span><h3 class="font-bold text-sm text-[#6b5b5e]">My Playlist</h3></div><span id="storage-status" class="text-[11px] text-pink-400/90 font-medium">0 songs · 0.0 MB</span></div>
+<label class="w-full py-3 px-4 rounded-2xl border-2 border-dashed border-pink-300 bg-pink-50/50 hover:bg-pink-50 text-pink-500 font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer transition active:scale-98 shadow-2xs"><i class="fa-solid fa-plus-circle text-sm"></i><span>Add MP3 Songs</span><input type="file" id="mp3-upload-input" accept="audio/mpeg,audio/mp3,audio/*" multiple class="hidden"></label>
+<div id="playlist-container" class="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1"><div id="empty-playlist" class="flex flex-col items-center justify-center py-8 text-center text-pink-300/80"><span class="text-2xl mb-1">♡</span><p class="text-xs font-medium text-pink-400">Your playlist is empty</p><p class="text-[11px] text-pink-300 mt-0.5">Add your favorite MP3s to begin.</p></div></div>
+</div></div>
+
+<div id="delete-modal" class="fixed inset-0 bg-black/30 backdrop-blur-xs flex items-center justify-center z-50 hidden px-4"><div class="glass-card rounded-3xl p-6 w-full max-w-[280px] flex flex-col items-center text-center shadow-xl"><div class="w-12 h-12 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center text-xl mb-3"><i class="fa-solid fa-trash-can"></i></div><h3 class="font-bold text-sm text-[#5c5254] mb-1">Delete this song?</h3><p id="delete-song-name" class="text-xs text-pink-400 mb-5 line-clamp-1">Song title here</p><div class="flex gap-2 w-full"><button id="modal-cancel-btn" class="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-xs font-semibold">Cancel</button><button id="modal-delete-btn" class="flex-1 py-2.5 rounded-xl bg-pink-400 text-white text-xs font-semibold">Delete</button></div></div></div>
+<div id="alert-modal" class="fixed inset-0 bg-black/30 backdrop-blur-xs flex items-center justify-center z-50 hidden px-4"><div class="glass-card rounded-3xl p-6 w-full max-w-[280px] flex flex-col items-center text-center shadow-xl"><div class="w-12 h-12 rounded-full bg-red-50 text-red-400 flex items-center justify-center text-xl mb-3"><i class="fa-solid fa-triangle-exclamation"></i></div><h3 class="font-bold text-sm text-[#5c5254] mb-1">Playback Error</h3><p id="alert-msg" class="text-xs text-pink-400 mb-5">This song couldn’t be played.</p><button id="alert-ok-btn" class="w-full py-2.5 rounded-xl bg-pink-400 text-white text-xs font-semibold">OK</button></div></div>
+
+<script>
+const DB_NAME='MyLittleMusicDB', STORE_NAME='tracks', DB_VERSION=1;
+let db=null, tracks=[], currentTrackId=localStorage.getItem('mlmp_last_track_id')||null, isPlaying=false;
+let volume=parseFloat(localStorage.getItem('mlmp_volume')); if(isNaN(volume)) volume=1;
+let shuffleMode=localStorage.getItem('mlmp_shuffle')==='true';
+let repeatMode=localStorage.getItem('mlmp_repeat')||'none';
+const audioElement=new Audio(); audioElement.volume=volume;
+let currentObjectURL=null, songToDeleteId=null;
+
+const $=id=>document.getElementById(id);
+const uploadInput=$('mp3-upload-input'), playlistContainer=$('playlist-container'), emptyPlaylist=$('empty-playlist');
+const currentTitle=$('current-title'), currentArtist=$('current-artist'), playPauseBtn=$('play-pause-btn'), playIcon=$('play-icon');
+const prevBtn=$('prev-btn'), nextBtn=$('next-btn'), progressBar=$('progress-bar'), currentTimeEl=$('current-time'), totalDurationEl=$('total-duration');
+const volumeBar=$('volume-bar'), shuffleBtn=$('shuffle-btn'), repeatBtn=$('repeat-btn'), repeatIndicator=$('repeat-indicator'), storageStatus=$('storage-status'), vinylDisc=$('vinyl-disc');
+const deleteModal=$('delete-modal'), deleteSongName=$('delete-song-name'), modalCancelBtn=$('modal-cancel-btn'), modalDeleteBtn=$('modal-delete-btn');
+const alertModal=$('alert-modal'), alertMsg=$('alert-msg'), alertOkBtn=$('alert-ok-btn');
+
+function initDB(){
+ return new Promise((resolve,reject)=>{
+  const request=indexedDB.open(DB_NAME,DB_VERSION);
+  request.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(STORE_NAME))d.createObjectStore(STORE_NAME,{keyPath:'id'});};
+  request.onsuccess=e=>{db=e.target.result;db.onversionchange=()=>db.close();resolve(db);};
+  request.onerror=e=>reject(e.target.error);
+ });
+}
+function getAllTracksFromDB(){
+ return new Promise((resolve,reject)=>{
+  if(!db)return reject(new Error('Database not initialized'));
+  const tx=db.transaction(STORE_NAME,'readonly'), req=tx.objectStore(STORE_NAME).getAll();
+  req.onsuccess=()=>resolve(req.result||[]); req.onerror=e=>reject(e.target.error);
+ });
+}
+function saveTrackToDB(t){
+ return new Promise((resolve,reject)=>{
+  if(!db)return reject(new Error('Database not initialized'));
+  const tx=db.transaction(STORE_NAME,'readwrite');
+  tx.objectStore(STORE_NAME).put(t);
+  tx.oncomplete=resolve; tx.onerror=e=>reject(e.target.error); tx.onabort=e=>reject(e.target.error||new Error('Transaction aborted'));
+ });
+}
+function deleteTrackFromDB(id){
+ return new Promise((resolve,reject)=>{
+  if(!db)return reject(new Error('Database not initialized'));
+  const tx=db.transaction(STORE_NAME,'readwrite'); tx.objectStore(STORE_NAME).delete(id);
+  tx.oncomplete=resolve; tx.onerror=e=>reject(e.target.error); tx.onabort=e=>reject(e.target.error||new Error('Transaction aborted'));
+ });
+}
+function formatTime(s){if(!Number.isFinite(s))return'00:00';const m=Math.floor(s/60),x=Math.floor(s%60);return`${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`;}
+function cleanSongName(n){return n.replace(/\.[^/.]+$/,'');}
+function updateStorageStatus(){const bytes=tracks.reduce((a,t)=>a+(t.size||0),0);storageStatus.textContent=`${tracks.length} songs · ${(bytes/1048576).toFixed(1)} MB`;}
+
+function escapeHTML(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function renderPlaylist(){
+ playlistContainer.innerHTML='';
+ if(!tracks.length){playlistContainer.appendChild(emptyPlaylist);emptyPlaylist.classList.remove('hidden');currentTitle.textContent='No song selected ♡';currentArtist.textContent='Upload mp3 to start';updateStorageStatus();return;}
+ emptyPlaylist.classList.add('hidden');
+ tracks.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+ tracks.forEach(track=>{
+  const current=track.id===currentTrackId, div=document.createElement('div');
+  div.className=`flex items-center justify-between p-2.5 rounded-2xl transition border ${current?'bg-pink-100/70 border-pink-300 shadow-2xs':'bg-white/60 border-pink-100 hover:bg-pink-50/50'}`;
+  div.innerHTML=`<div class="flex items-center gap-3 overflow-hidden cursor-pointer flex-1 mr-2 track-play"><div class="w-9 h-9 rounded-xl ${current?'pink-gradient text-white':'bg-pink-50 text-pink-400'} flex items-center justify-center shrink-0 shadow-xs"><i class="fa-solid ${current&&isPlaying?'fa-volume-high animate-pulse':'fa-music'} text-xs"></i></div><div class="overflow-hidden"><h4 class="text-xs font-bold ${current?'text-pink-600':'text-[#5c5254]'} truncate">${escapeHTML(cleanSongName(track.name))}</h4><p class="text-[10px] text-pink-400/80 truncate">${((track.size||0)/1048576).toFixed(1)} MB</p></div></div><button class="w-8 h-8 rounded-xl text-pink-300 hover:text-red-400 hover:bg-red-50 flex items-center justify-center transition delete-track" title="Delete"><i class="fa-solid fa-trash-can text-xs"></i></button>`;
+  div.querySelector('.track-play').addEventListener('click',()=>playTrack(track.id));
+  div.querySelector('.delete-track').addEventListener('click',e=>openDeleteModal(track.id,e));
+  playlistContainer.appendChild(div);
+ });
+ updateStorageStatus();
+}
+async function playTrack(id){
+ const track=tracks.find(t=>t.id===id); if(!track)return;
+ currentTrackId=id; localStorage.setItem('mlmp_last_track_id',id);
+ if(currentObjectURL)URL.revokeObjectURL(currentObjectURL);
+ currentObjectURL=URL.createObjectURL(track.blob); audioElement.src=currentObjectURL;
+ currentTitle.textContent=cleanSongName(track.name); currentArtist.textContent='Coquette Playlist';
+ try{await audioElement.play();isPlaying=true;playIcon.className='fa-solid fa-pause';vinylDisc.classList.remove('paused');renderPlaylist();}
+ catch(e){isPlaying=false;playIcon.className='fa-solid fa-play';vinylDisc.classList.add('paused');showCustomAlert('This song couldn’t be played or format is not supported.');}
+}
+function togglePlayPause(){
+ if(!tracks.length)return;
+ if(!currentTrackId){playTrack(tracks[0].id);return;}
+ if(isPlaying){audioElement.pause();isPlaying=false;playIcon.className='fa-solid fa-play';vinylDisc.classList.add('paused');renderPlaylist();}
+ else audioElement.play().then(()=>{isPlaying=true;playIcon.className='fa-solid fa-pause';vinylDisc.classList.remove('paused');renderPlaylist();}).catch(()=>showCustomAlert('Playback error occurred.'));
+}
+function playNextTrack(){
+ if(!tracks.length)return;
+ const i=tracks.findIndex(t=>t.id===currentTrackId);
+ if(shuffleMode){let r;do{r=Math.floor(Math.random()*tracks.length)}while(r===i&&tracks.length>1);playTrack(tracks[r].id);return;}
+ playTrack(tracks[(i+1)%tracks.length].id);
+}
+function playPrevTrack(){if(!tracks.length)return;const i=tracks.findIndex(t=>t.id===currentTrackId);playTrack(tracks[(i-1+tracks.length)%tracks.length].id);}
+
+uploadInput.addEventListener('change',async e=>{
+ const files=Array.from(e.target.files||[]); if(!files.length)return;
+ try{
+  for(const file of files){
+   const newTrack={id:'track_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),name:file.name,blob:file,type:file.type||'audio/mpeg',size:file.size,createdAt:Date.now()};
+   await saveTrackToDB(newTrack); tracks.push(newTrack);
+  }
+  uploadInput.value='';renderPlaylist();
+  if(!currentTrackId&&tracks.length){currentTrackId=tracks[0].id;localStorage.setItem('mlmp_last_track_id',currentTrackId);renderPlaylist();}
+ }catch(err){console.error(err);showCustomAlert('음악 저장에 실패했습니다. 브라우저 저장공간이 부족할 수 있어요.');}
+});
+
+function openDeleteModal(id,e){e.stopPropagation();songToDeleteId=id;const t=tracks.find(x=>x.id===id);if(t)deleteSongName.textContent=cleanSongName(t.name);deleteModal.classList.remove('hidden');}
+modalCancelBtn.addEventListener('click',()=>{deleteModal.classList.add('hidden');songToDeleteId=null;});
+modalDeleteBtn.addEventListener('click',async()=>{
+ if(!songToDeleteId)return; const id=songToDeleteId, current=id===currentTrackId;
+ try{await deleteTrackFromDB(id);tracks=tracks.filter(t=>t.id!==id);deleteModal.classList.add('hidden');
+  if(current){audioElement.pause();isPlaying=false;playIcon.className='fa-solid fa-play';vinylDisc.classList.add('paused');if(currentObjectURL)URL.revokeObjectURL(currentObjectURL);
+   if(tracks.length){currentTrackId=tracks[0].id;localStorage.setItem('mlmp_last_track_id',currentTrackId);renderPlaylist();}else{currentTrackId=null;localStorage.removeItem('mlmp_last_track_id');audioElement.removeAttribute('src');renderPlaylist();}
+  }else renderPlaylist();
+ }catch(err){showCustomAlert('삭제에 실패했습니다.');} songToDeleteId=null;
+});
+function showCustomAlert(msg){alertMsg.textContent=msg;alertModal.classList.remove('hidden');}
+alertOkBtn.addEventListener('click',()=>alertModal.classList.add('hidden'));
+
+audioElement.addEventListener('timeupdate',()=>{if(Number.isFinite(audioElement.duration)){progressBar.value=(audioElement.currentTime/audioElement.duration)*100;currentTimeEl.textContent=formatTime(audioElement.currentTime);totalDurationEl.textContent=formatTime(audioElement.duration);}});
+audioElement.addEventListener('loadedmetadata',()=>{totalDurationEl.textContent=formatTime(audioElement.duration);});
+audioElement.addEventListener('ended',()=>{if(repeatMode==='one'){audioElement.currentTime=0;audioElement.play();}else if(repeatMode==='all'){playNextTrack();}else{const i=tracks.findIndex(t=>t.id===currentTrackId);if(i>=0&&i<tracks.length-1)playNextTrack();else{isPlaying=false;playIcon.className='fa-solid fa-play';vinylDisc.classList.add('paused');renderPlaylist();}}});
+progressBar.addEventListener('input',e=>{if(Number.isFinite(audioElement.duration))audioElement.currentTime=(e.target.value/100)*audioElement.duration;});
+volumeBar.addEventListener('input',e=>{volume=Number(e.target.value);audioElement.volume=volume;localStorage.setItem('mlmp_volume',String(volume));});
+playPauseBtn.addEventListener('click',togglePlayPause);nextBtn.addEventListener('click',playNextTrack);prevBtn.addEventListener('click',playPrevTrack);
+shuffleBtn.addEventListener('click',()=>{shuffleMode=!shuffleMode;localStorage.setItem('mlmp_shuffle',String(shuffleMode));shuffleBtn.classList.toggle('text-pink-500',shuffleMode);shuffleBtn.classList.toggle('text-pink-300',!shuffleMode);});
+repeatBtn.addEventListener('click',()=>{repeatMode=repeatMode==='none'?'all':repeatMode==='all'?'one':'none';localStorage.setItem('mlmp_repeat',repeatMode);repeatIndicator.textContent=repeatMode==='all'?'All':repeatMode==='one'?'1':'';repeatBtn.classList.toggle('text-pink-500',repeatMode!=='none');repeatBtn.classList.toggle('text-pink-300',repeatMode==='none');});
+
+window.addEventListener('DOMContentLoaded',async()=>{
+ volumeBar.value=volume;shuffleBtn.classList.toggle('text-pink-500',shuffleMode);shuffleBtn.classList.toggle('text-pink-300',!shuffleMode);
+ repeatIndicator.textContent=repeatMode==='all'?'All':repeatMode==='one'?'1':'';repeatBtn.classList.toggle('text-pink-500',repeatMode!=='none');repeatBtn.classList.toggle('text-pink-300',repeatMode==='none');
+ try{
+  await initDB();tracks=await getAllTracksFromDB();tracks.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));renderPlaylist();
+  if(currentTrackId&&tracks.some(t=>t.id===currentTrackId)){const t=tracks.find(x=>x.id===currentTrackId);currentObjectURL=URL.createObjectURL(t.blob);audioElement.src=currentObjectURL;currentTitle.textContent=cleanSongName(t.name);currentArtist.textContent='Coquette Playlist';}
+  else if(tracks.length){currentTrackId=tracks[0].id;localStorage.setItem('mlmp_last_track_id',currentTrackId);const t=tracks[0];currentObjectURL=URL.createObjectURL(t.blob);audioElement.src=currentObjectURL;currentTitle.textContent=cleanSongName(t.name);currentArtist.textContent='Coquette Playlist';}
+ }catch(err){console.error('[DB]',err);showCustomAlert('음악 데이터베이스를 불러오지 못했습니다.');}
+});
+</script>
+</body>
+</html>
